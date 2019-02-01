@@ -1,0 +1,8 @@
+language: go
+
+go:
+  - "1.11.x"
+  - master
+
+script:
+  - export GO111MODULE=on && make clean test fmt pack-all
