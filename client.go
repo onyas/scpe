@@ -10,6 +10,7 @@ import (
 	"path"
 	"syscall"
 	"time"
+	"github.com/pkg/sftp"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
@@ -190,11 +191,18 @@ func (c *defaultClient) StartScp(sourceFile string, targetPath string, scpType i
 
 	// scp
 	if scpType == 1 {
-		err = copyFromLocalToServer(sourceFile, targetPath, stdinPipe, session)
+		err = copyFromLocalToServer(sourceFile, targetPath, stdinPipe)
 		if err != nil {
 			l.Error(err)
 			return
 		}
+	} else if scpType == 0 {
+		err = copyFromServerToLocal(sourceFile, targetPath, client)
+		if err != nil {
+			l.Error(err)
+			return
+		}
+		fmt.Fprint(stdinPipe, "\003")// ctrl+c
 	}
 
 	// callback after scp
@@ -246,8 +254,39 @@ func (c *defaultClient) StartScp(sourceFile string, targetPath string, scpType i
 
 	session.Wait()
 }
+func copyFromServerToLocal(filePath, destinationPath string, client *ssh.Client) error {
+	l.Infof("new sftp client")
+	// open an SFTP session over an existing ssh connection.
+	sftp, err := sftp.NewClient(client)
+	if err != nil {
+		return err
+	}
+	defer sftp.Close()
 
-func copyFromLocalToServer(filePath, destinationPath string, pipe io.WriteCloser, session *ssh.Session) error {
+	l.Infof("sftp open file %s", filePath)
+	// Open the source file
+	srcFile, err := sftp.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	l.Infof("create file in local %s", destinationPath+path.Base(filePath))
+	// Create the destination file
+	dstFile, err := os.Create(destinationPath + path.Base(filePath))
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// Copy the file
+	srcFile.WriteTo(dstFile)
+	l.Infof("download file success!\n")
+
+	return nil
+}
+
+func copyFromLocalToServer(filePath, destinationPath string, pipe io.WriteCloser) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -257,10 +296,10 @@ func copyFromLocalToServer(filePath, destinationPath string, pipe io.WriteCloser
 	if err != nil {
 		return err
 	}
-	return copy(s.Size(), s.Mode().Perm(), path.Base(filePath), f, destinationPath, pipe, session)
+	return copy(s.Size(), s.Mode().Perm(), path.Base(filePath), f, destinationPath, pipe)
 }
 
-func copy(size int64, mode os.FileMode, fileName string, contents io.Reader, destination string, pipe io.WriteCloser, session *ssh.Session) error {
+func copy(size int64, mode os.FileMode, fileName string, contents io.Reader, destination string, pipe io.WriteCloser) error {
 	cmd := shellquote.Join("scp", "-t", destination)
 	pipe.Write([]byte(cmd + "\r"))
 

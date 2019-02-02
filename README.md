@@ -42,7 +42,6 @@ config example:
   - { name: server 1, user: root, host: 192.168.2.2 }
   - { name: server 2, user: root, host: 192.168.3.3 }
   - { name: server 3, user: root, host: 192.168.4.4 }
-```
 
 # before-cp-callback-shells
 - name: dev server fully configured
@@ -54,3 +53,5 @@ config example:
   - {cmd: 2}
   - {delay: 1500, cmd: 0}
   - {cmd: 'echo 1'}
+  
+ ```
