@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
-	"scpe"
+	"github.com/onyas/scpe"
 	"runtime"
 )
 
